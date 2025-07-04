@@ -6,7 +6,7 @@ https://bbs.hassbian.com/thread-29746-1-1.html
 
 使用抓包工具抓到小程序登录时的account_id和refreshToken即可
 
-感谢https://github.com/banto6/haier提供的参考
+感谢[banto6](https://github.com/banto6/haier)提供的参考
 ## 已支持实体
 - Switch
 - Number
