@@ -39,10 +39,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     hass.async_create_background_task(client.listen_devices(devices, device_signal), 'tcl-device-data')
     hass.data[DOMAIN]['signals'].append(device_signal)
 
-    # 增加 climate 平台支持 (现在直接使用 SUPPORTED_PLATFORMS，因为 Platform.CLIMATE 已添加到 const.py)
-    platforms = list(SUPPORTED_PLATFORMS) # 直接使用 SUPPORTED_PLATFORMS
-
-    await hass.config_entries.async_forward_entry_setups(entry, platforms)
+    await hass.config_entries.async_forward_entry_setups(entry, SUPPORTED_PLATFORMS)
 
     entry.async_on_unload(entry.add_update_listener(entry_update_listener))
 
@@ -50,6 +47,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
 
 async def token_updater(hass: HomeAssistant, entry: ConfigEntry, signal: threading.Event):
+    """
+    每1小时检查一次token有效性，若token刷新则重载集成
+    :param hass:
+    :param entry:
+    :param signal:
+    :return:
+    """
     while not signal.is_set():
         if await try_update_token(hass, entry):
             _LOGGER.info('token refreshed, reload integration...')
@@ -62,6 +66,12 @@ async def token_updater(hass: HomeAssistant, entry: ConfigEntry, signal: threadi
 
 
 async def try_update_token(hass: HomeAssistant, entry: ConfigEntry):
+    """
+    尝试刷新token，刷新成功返回True，如refresh_token无效则会抛出异常
+    :param hass:
+    :param entry:
+    :return:
+    """
     cfg = AccountConfig(hass, entry)
     client = TclClient(hass, cfg.account_id, cfg.token)
 
@@ -78,7 +88,6 @@ async def try_update_token(hass: HomeAssistant, entry: ConfigEntry):
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
-    # 遍历 SUPPORTED_PLATFORMS，现在包含了 Platform.CLIMATE
     for platform in SUPPORTED_PLATFORMS:
         if not await hass.config_entries.async_forward_entry_unload(entry, platform):
             return False
