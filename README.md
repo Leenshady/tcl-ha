@@ -12,7 +12,7 @@ https://bbs.hassbian.com/thread-29746-1-1.html
 - Number
 - Select
 - Sensor
-
+- CLIMATE
 ## 安装
 
 方法1：下载并复制`custom_components/tcl`文件夹到HomeAssistant根目录下的`custom_components`文件夹即可完成安装
