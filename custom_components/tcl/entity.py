@@ -57,7 +57,7 @@ class TclAbstractEntity(Entity, ABC):
 
     @abstractmethod
     def _update_value(self):
-        self._attributes_data=self._device.attribute_snapshot_data
+        pass
 
     async def async_added_to_hass(self) -> None:
         # 监听状态
@@ -71,7 +71,6 @@ class TclAbstractEntity(Entity, ABC):
         def data_callback(event):
             if event.data['deviceId'] != self._device.id:
                 return
-            self._device.update_attribute_snapshot_data(event.data['attributes'])
             self._attributes_data = event.data['attributes']
             self._update_value()
             self.schedule_update_ha_state()
@@ -86,15 +85,13 @@ class TclAbstractEntity(Entity, ABC):
         # 监听事件总线来的控制命令
         async def control_callback(e):
             await self._client.send_command(self._client.getSession,self._client.getToken,e.data['deviceId'], e.data['attributes'])
-            #直接刷新属性状状
-            device_data=self._device.attribute_snapshot_data
+            # 直接刷新属性状状
+            device_data = self._device.attribute_snapshot_data
             for key, value in e.data['attributes'].items():
-                device_data[str(key)]=value
-            self._device.update_attribute_snapshot_data(device_data)
+                device_data[str(key)] = value
             self._attributes_data = device_data
             self._update_value()
             self.schedule_update_ha_state()
-
         self._listen_cancel.append(listen_event(self.hass, EVENT_DEVICE_CONTROL, control_callback))
 
 

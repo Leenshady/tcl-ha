@@ -68,27 +68,52 @@ class V1SpecAttributeParser(TclAttributeParser, ABC):
         options = {}
         ext = {}
         value_comparison_table = {}
+        
+        # 保存结构体的整体信息
+        ext['struct_info'] = {
+            'title': attribute['title'],
+            'description': attribute.get('description', ''),
+            'function': attribute.get('function', '')
+        }
+        
         for item in attribute['specs']:
             data_type = item['dataType']['type']
             data_id = item['identifier']
             data_opthons = {}
-            data_ext = {}
+            data_ext = {
+                'name': item['name']  # 保存字段的中文名称
+            }
             data_value_comparison_table = {}
+            
+            # 处理枚举类型
             if 'enum' in data_type:
                 for key, value in item['dataType']['specs'].items():
                     data_value_comparison_table[str(key)] = value
-                    data_opthons['device_class'] = SensorDeviceClass.ENUM
-                    data_opthons['options'] = list(data_value_comparison_table.values())
+                data_opthons['device_class'] = SensorDeviceClass.ENUM
+                data_opthons['options'] = list(data_value_comparison_table.values())
                 data_ext['value_comparison_table'] = data_value_comparison_table
-            if 'int' in attribute['type'] or 'double' in attribute['type'] or 'float' in attribute['type']:
-                step = item['dataType']['specs']
+            
+            # 处理数值类型
+            if 'int' in data_type or 'double' in data_type or 'float' in data_type:
+                specs = item['dataType']['specs']
                 data_opthons['device_class'] = "number"
                 data_opthons = {
-                    'native_min_value': float(step['min']),
-                    'native_max_value': float(step['max']),
-                    'native_unit_of_measurement': step['unit'],
-                    'native_step': step['step']
+                    'native_min_value': float(specs.get('min', 0)),
+                    'native_max_value': float(specs.get('max', 100)),
+                    'native_step': float(specs.get('step', 1))
                 }
+                
+                # 添加单位信息
+                if 'unit' in specs:
+                    data_opthons['native_unit_of_measurement'] = specs['unit']
+                    data_ext['unit'] = specs['unit']
+                    if 'unitName' in specs:
+                        data_ext['unit_name'] = specs['unitName']
+            
+            # 保存映射类型信息
+            if 'mappingType' in item['dataType']:
+                data_ext['mapping_type'] = item['dataType']['mappingType']
+            
             options[str(data_id)] = data_opthons
             ext[str(data_id)] = data_ext
             value_comparison_table[str(data_id)] = data_value_comparison_table

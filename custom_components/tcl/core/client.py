@@ -451,13 +451,6 @@ class TclClient:
 
             _LOGGER.info('listen device stopped.')
 
-
-    async def _parse_message(self, device_id: str, device_data: dict):
-        fire_event(self._hass, EVENT_DEVICE_DATA_CHANGED, {
-            'deviceId': device_id,
-            'attributes': device_data
-        })
-
     @staticmethod
     async def send_command(session, token, deviceId: str, attributes: dict):
         api_url = CONTROIL_DEVICE_API.format(deviceId=deviceId)

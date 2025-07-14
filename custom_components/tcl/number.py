@@ -29,7 +29,8 @@ class TclNumber(TclAbstractEntity, NumberEntity):
         super().__init__(device, attribute)
 
     def _update_value(self):
-        self._attr_native_value = self._attributes_data[self._attribute.key]
+        if self._attribute.key in self._attributes_data:
+            self._attr_native_value = self._attributes_data[self._attribute.key]
 
     def set_native_value(self, value: float) -> None:
         self._send_command({

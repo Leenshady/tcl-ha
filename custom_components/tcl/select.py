@@ -32,7 +32,8 @@ class TclSelect(TclAbstractEntity, SelectEntity):
             raise ValueError('value_comparison_table must exist')
 
     def _update_value(self):
-        self._attr_current_option = self._get_value_from_comparison_table(self._attributes_data[self._attribute.key])
+        if self._attribute.key in self._attributes_data:
+            self._attr_current_option = self._get_value_from_comparison_table(self._attributes_data[self._attribute.key])
 
     def select_option(self, option: str) -> None:
         self._send_command({

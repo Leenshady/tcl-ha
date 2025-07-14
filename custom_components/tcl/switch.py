@@ -32,7 +32,8 @@ class TclSwitch(TclAbstractEntity, SwitchEntity):
 
     def _update_value(self):
         try:
-            self._attr_is_on = try_read_as_bool(self._attributes_data[self._attribute.key])
+            if self._attribute.key in self._attributes_data:
+                self._attr_is_on = try_read_as_bool(self._attributes_data[self._attribute.key])
         except ValueError:
             _LOGGER.exception('entity [{}] read value failed'.format(self._attr_unique_id))
             self._attr_available = False
