@@ -13,5 +13,9 @@ def try_read_as_bool(value):
 def get_key_by_value(d, value):
     for key, val in d.items():
         if val == value:
-            return key
+            try:
+                return int(key)
+            except ValueError:
+                # 如果转换失败，返回原字符串
+                return key
     return None  # 如果没有找到，返回None
