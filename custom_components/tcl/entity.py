@@ -51,6 +51,7 @@ class TclAbstractEntity(Entity, ABC):
         :return:
         """
         fire_event(self.hass, EVENT_DEVICE_CONTROL, {
+            'entityId': self.entity_id,
             'deviceId': self._device.id,
             'attributes': attributes
         })
@@ -84,14 +85,17 @@ class TclAbstractEntity(Entity, ABC):
 
         # 监听事件总线来的控制命令
         async def control_callback(e):
-            await self._client.send_command(self._client.getSession,self._client.getToken,e.data['deviceId'], e.data['attributes'])
-            # 直接刷新属性状状
-            device_data = self._device.attribute_snapshot_data
-            for key, value in e.data['attributes'].items():
-                device_data[str(key)] = value
-            self._attributes_data = device_data
-            self._update_value()
-            self.schedule_update_ha_state()
+            #每个实体都会注册该事件，目前根据entityId进行判断防治多次操作
+            if(self.entity_id==e.data['entityId']):
+                # _LOGGER.warning('_send_command' + str(e.data['attributes']) + '_attr_name' + self._attr_name + 'entity_id' + self.entity_id)
+                await self._client.send_command(self._client.getSession,self._client.getToken,e.data['deviceId'], e.data['attributes'])
+                # 直接刷新属性状状
+                device_data = self._device.attribute_snapshot_data
+                for key, value in e.data['attributes'].items():
+                    device_data[str(key)] = value
+                self._attributes_data = device_data
+                self._update_value()
+                self.schedule_update_ha_state()
         self._listen_cancel.append(listen_event(self.hass, EVENT_DEVICE_CONTROL, control_callback))
 
 
