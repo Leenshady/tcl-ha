@@ -147,12 +147,12 @@ class TclClimateEntity(TclAbstractEntity, ClimateEntity):
         """设置 HVAC 模式。"""
         if hvac_mode == HVACMode.OFF:
             # 注意：这里将属性键改为驼峰命名法以匹配设备数据
-            self._send_command({"powerSwitch": False})
+            self._send_command({"powerSwitch": 0})
         else:
             # 如果当前是关闭状态，先打开电源
             # 注意：这里将属性键改为驼峰命名法以匹配设备数据
             if self._device.attribute_snapshot_data.get("powerSwitch") in ["off", False, 0]:
-                self._send_command({"powerSwitch": True})
+                self._send_command({"powerSwitch": 1})
                 asyncio.sleep(0.5)  # 稍微延迟，确保电源状态已更新
             # 注意：这里将属性键改为驼峰命名法以匹配设备数据
             modeKey=REVERSE_MODE_MAP.get(hvac_mode, "auto")
