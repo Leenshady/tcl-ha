@@ -5,7 +5,7 @@ from homeassistant.components.sensor import SensorDeviceClass
 from homeassistant.components.switch import SwitchDeviceClass
 from homeassistant.const import Platform
 
-from helpers import ATTR_NAME
+from ..helpers import ATTR_NAME
 
 _LOGGER = logging.getLogger(__name__)
 
