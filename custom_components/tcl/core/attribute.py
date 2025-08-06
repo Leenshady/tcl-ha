@@ -1,10 +1,11 @@
 import logging
 from abc import abstractmethod, ABC
-from typing import List
 
 from homeassistant.components.sensor import SensorDeviceClass
 from homeassistant.components.switch import SwitchDeviceClass
 from homeassistant.const import Platform
+
+from ..helpers import ATTR_NAME
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -118,7 +119,7 @@ class V1SpecAttributeParser(TclAttributeParser, ABC):
             ext[str(data_id)] = data_ext
             value_comparison_table[str(data_id)] = data_value_comparison_table
 
-        return TclAttribute(attribute['identifier'], attribute['title'], Platform.SENSOR, options, ext)
+        return TclAttribute(attribute['identifier'], ATTR_NAME.get(attribute['identifier'],attribute['title']), Platform.SENSOR, options, ext)
 
     @staticmethod
     def _parse_as_number(attribute):
@@ -130,7 +131,7 @@ class V1SpecAttributeParser(TclAttributeParser, ABC):
             'native_step': step['step']
         }
 
-        return TclAttribute(attribute['identifier'], attribute['title'], Platform.NUMBER, options)
+        return TclAttribute(attribute['identifier'], ATTR_NAME.get(attribute['identifier'],attribute['title']), Platform.NUMBER, options)
 
     @staticmethod
     def _parse_as_select(attribute):
@@ -148,7 +149,7 @@ class V1SpecAttributeParser(TclAttributeParser, ABC):
             'options': optionslist
         }
 
-        return TclAttribute(attribute['identifier'], attribute['title'], Platform.SELECT, options, ext)
+        return TclAttribute(attribute['identifier'], ATTR_NAME.get(attribute['identifier'],attribute['title']), Platform.SELECT, options, ext)
 
     @staticmethod
     def _parse_as_switch(attribute):
@@ -156,4 +157,4 @@ class V1SpecAttributeParser(TclAttributeParser, ABC):
             'device_class': SwitchDeviceClass.SWITCH
         }
 
-        return TclAttribute(attribute['identifier'], attribute['title'], Platform.SWITCH, options)
+        return TclAttribute(attribute['identifier'], ATTR_NAME.get(attribute['identifier'],attribute['title']), Platform.SWITCH, options)
