@@ -45,7 +45,6 @@ class AccountConfig:
                     'token': self.token,
                     'refresh_token': self.refresh_token,
                     'expires_at': self.expires_at,
-                    'refresh_data_time': self.refresh_data_time,
                     'default_load_all_entity': self.default_load_all_entity
                 }
             }

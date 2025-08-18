@@ -8,7 +8,6 @@
                 "data": {
                     "account_id": "Account Id",
                     "refresh_token": "Refresh Token",
-                    "refresh_data_time": "Polling data time (minutes)",
                     "default_load_all_entity": "Default load all entity"
                 },
                 "description": "Enter your Tcl Token.",
