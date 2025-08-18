@@ -39,9 +39,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     device_signal = threading.Event()
     hass.async_create_background_task(client.listen_devices(devices, device_signal), 'tcl-device-data')
     hass.data[DOMAIN]['signals'].append(device_signal)
-    device_updater_signal = threading.Event()
-    hass.async_create_background_task(data_updater(hass,account_cfg,client,devices,device_updater_signal), 'tcl-device-data-updater')
-    hass.data[DOMAIN]['signals'].append(device_updater_signal)
+    #轮训获取数据,已废弃
+    # device_updater_signal = threading.Event()
+    # hass.async_create_background_task(data_updater(hass,account_cfg,client,devices,device_updater_signal), 'tcl-device-data-updater')
+    # hass.data[DOMAIN]['signals'].append(device_updater_signal)
 
     await hass.config_entries.async_forward_entry_setups(entry, SUPPORTED_PLATFORMS)
 
@@ -49,27 +50,27 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
     return True
 
-async def data_updater(hass: HomeAssistant,config: AccountConfig,client: TclClient,targetDevices: List[TclDevice], signal: threading.Event):
-    """
-    每5分钟刷新一次空调数据
-    :param hass:
-    :param entry:
-    :param signal:
-    :return:
-    """
-    while not signal.is_set():
-        refresh_data_time=config.refresh_data_time
-        if refresh_data_time>0:
-            for device in targetDevices:
-                device_id = device.id
-                newdata=await client.get_device_snapshot_data(device_id)
-                # 触发设备数据变化事件
-                fire_event(hass, EVENT_DEVICE_DATA_CHANGED, {
-                    'deviceId': device_id,
-                    'attributes': newdata
-                })
-        refresh_data_time if refresh_data_time > 1 else 1
-        await asyncio.sleep(refresh_data_time*60)
+# async def data_updater(hass: HomeAssistant,config: AccountConfig,client: TclClient,targetDevices: List[TclDevice], signal: threading.Event):
+#     """
+#     每5分钟刷新一次空调数据
+#     :param hass:
+#     :param entry:
+#     :param signal:
+#     :return:
+#     """
+#     while not signal.is_set():
+#         refresh_data_time=config.refresh_data_time
+#         if refresh_data_time>0:
+#             for device in targetDevices:
+#                 device_id = device.id
+#                 newdata=await client.get_device_snapshot_data(device_id)
+#                 # 触发设备数据变化事件
+#                 fire_event(hass, EVENT_DEVICE_DATA_CHANGED, {
+#                     'deviceId': device_id,
+#                     'attributes': newdata
+#                 })
+#         refresh_data_time if refresh_data_time > 1 else 1
+#         await asyncio.sleep(refresh_data_time*60)
 
 async def token_updater(hass: HomeAssistant, entry: ConfigEntry, signal: threading.Event):
     """

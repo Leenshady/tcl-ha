@@ -355,7 +355,7 @@ class TclClient:
                     device_id = device['deviceId']
                     product_key = device['productKey']
                     # 订阅设备属性状态
-                    property_topic = f"/sys/{product_key}/{device_id}/thing/service/property/set_reply"
+                    property_topic = f"/sys/{product_key}/{device_id}/thing/event/property/post"
                     client.subscribe(property_topic, qos=1)
                     _LOGGER.debug(f"已订阅设备属性主题: {property_topic}")
 
@@ -376,12 +376,12 @@ class TclClient:
                 payload = json.loads(msg.payload.decode())
 
                 # 处理设备属性消息
-                if "/thing/service/property/" in msg.topic:
+                if "/thing/event/property/post" in msg.topic:
                     # 从主题中提取设备ID
                     parts = msg.topic.split('/')
                     if len(parts) >= 4:
                         device_id = parts[3]
-                        _LOGGER.debug(f"设备 {device_id} 属性更新: {payload}")
+                        _LOGGER.warning(f"设备 {device_id} 属性更新: {payload}")
 
                         # 提取属性值
                         if "params" in payload:

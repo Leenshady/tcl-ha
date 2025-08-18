@@ -22,8 +22,6 @@ class AccountConfig:
 
     default_load_all_entity: bool = None
 
-    refresh_data_time: int = None
-
     def __init__(self, hass: HomeAssistant, config: ConfigEntry):
         self._hass = hass
         self._config = config
@@ -33,7 +31,6 @@ class AccountConfig:
         self.token = cfg.get('token', '')
         self.refresh_token = cfg.get('refresh_token', '')
         self.expires_at = cfg.get('expires_at', 0)
-        self.refresh_data_time = cfg.get('refresh_data_time', 0)
         self.default_load_all_entity = cfg.get('default_load_all_entity', True)
 
 
