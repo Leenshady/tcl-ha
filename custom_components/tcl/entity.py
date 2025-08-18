@@ -70,9 +70,12 @@ class TclAbstractEntity(Entity, ABC):
 
         # 监听数据变化事件
         def data_callback(event):
-            if event.data['deviceId'] != self._device.id:
-                return
-            self._attributes_data = event.data['attributes']
+            if event.data['deviceId'] == self._device.id:
+                self._attributes_data = event.data['attributes']
+                device_data = self._device.attribute_snapshot_data
+                for key, value in event.data['attributes'].items():
+                    device_data[str(key)] = value
+                self._device.update_attribute_snapshot_data(device_data)
             self._update_value()
             self.schedule_update_ha_state()
 

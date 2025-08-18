@@ -102,6 +102,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 cfg.account_id = user_input[ACCOUNT_ID]
                 cfg.token = token_info.token
                 cfg.refresh_token = token_info.refresh_token
+                cfg.refresh_data_time = user_input['refresh_data_time']
                 cfg.default_load_all_entity = user_input['default_load_all_entity']
                 cfg.save(user_info['mobile'])
 
@@ -118,6 +119,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 {
                     vol.Required(ACCOUNT_ID, default=cfg.account_id): str,
                     vol.Required(REFRESH_TOKEN, default=cfg.refresh_token): str,
+                    vol.Required('refresh_data_time', default=cfg.refresh_data_time): int,
                     vol.Required('default_load_all_entity', default=cfg.default_load_all_entity): bool,
                 }
             ),

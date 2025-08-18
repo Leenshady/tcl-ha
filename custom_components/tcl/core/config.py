@@ -22,6 +22,8 @@ class AccountConfig:
 
     default_load_all_entity: bool = None
 
+    refresh_data_time: int = None
+
     def __init__(self, hass: HomeAssistant, config: ConfigEntry):
         self._hass = hass
         self._config = config
@@ -31,7 +33,9 @@ class AccountConfig:
         self.token = cfg.get('token', '')
         self.refresh_token = cfg.get('refresh_token', '')
         self.expires_at = cfg.get('expires_at', 0)
+        self.refresh_data_time = cfg.get('refresh_data_time', 0)
         self.default_load_all_entity = cfg.get('default_load_all_entity', True)
+
 
     def save(self, mobile: str = None):
         self._hass.config_entries.async_update_entry(
@@ -44,6 +48,7 @@ class AccountConfig:
                     'token': self.token,
                     'refresh_token': self.refresh_token,
                     'expires_at': self.expires_at,
+                    'refresh_data_time': self.refresh_data_time,
                     'default_load_all_entity': self.default_load_all_entity
                 }
             }

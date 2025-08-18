@@ -7,6 +7,11 @@ from homeassistant.components.climate.const import (
     ClimateEntityFeature,
     HVACMode,
     HVACAction,
+    SWING_ON,
+    SWING_OFF,
+    SWING_BOTH,
+    SWING_VERTICAL,
+    SWING_HORIZONTAL,
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_TEMPERATURE, UnitOfTemperature, Platform
@@ -79,6 +84,7 @@ class TclClimateEntity(TclAbstractEntity, ClimateEntity):
     _attr_supported_features = (
             ClimateEntityFeature.TARGET_TEMPERATURE
             | ClimateEntityFeature.FAN_MODE
+            | ClimateEntityFeature.SWING_MODE
         # 移除 ClimateEntityFeature.HVAC_MODE，因为您的 HomeAssistant 版本可能不支持此属性
     )
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
@@ -131,7 +137,8 @@ class TclClimateEntity(TclAbstractEntity, ClimateEntity):
         # 设置目标温度
         # 注意：这里将属性键改为驼峰命名法以匹配设备数据
         self._attr_target_temperature = self._device.attribute_snapshot_data.get("targetTemperature") or 24  # 默认温度为24
-
+        # 更新当前温度
+        self._current_temperature = self._device.attribute_snapshot_data.get("currentTemperature") or None
         # 设置风扇模式
         # 从设备获取实际风速百分比
         wind_speed_percentage = self._device.attribute_snapshot_data.get("windSpeedPercentage")
@@ -142,6 +149,16 @@ class TclClimateEntity(TclAbstractEntity, ClimateEntity):
             self._attr_fan_mode = REVERSE_FAN_SPEED_MAP.get(closest_speed, "中")  # 默认"中"
         else:
             self._attr_fan_mode = "中"  # 如果数据缺失，默认"中"
+
+        # 更新摆动模式
+        if self._device.attribute_snapshot_data.get("verticalWind") == 1 and self._device.attribute_snapshot_data.get("horizontalWind") == 1:
+            self._attr_swing_mode = SWING_BOTH
+        elif self._device.attribute_snapshot_data.get("verticalWind") == 1:
+            self._attr_swing_mode = SWING_VERTICAL
+        elif self._device.attribute_snapshot_data.get("horizontalWind") == 1:
+            self._attr_swing_mode = SWING_HORIZONTAL
+        else:
+            self._attr_swing_mode = SWING_OFF
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
         """设置 HVAC 模式。"""
@@ -174,3 +191,18 @@ class TclClimateEntity(TclAbstractEntity, ClimateEntity):
         if temp:
             # 注意：这里将属性键改为驼峰命名法以匹配设备数据
             self._send_command({"targetTemperature": temp})
+    @property
+    def swing_modes(self):
+        """摆动列表"""
+        return [SWING_OFF,SWING_BOTH,SWING_VERTICAL,SWING_HORIZONTAL]
+
+    def set_swing_mode(self, swing_mode: str) -> None:
+        """设置摆动"""
+        if swing_mode == SWING_OFF:
+            self._send_command({"verticalWind": 0, "horizontalWind": 0})
+        elif swing_mode == SWING_BOTH:
+            self._send_command({"verticalWind": 1, 'verticalDirection': 1, "horizontalWind": 1, 'horizontalDirection': 1})
+        elif swing_mode == SWING_VERTICAL:
+            self._send_command({"verticalWind": 1, 'verticalDirection': 1, "horizontalWind": 0})
+        elif swing_mode == SWING_HORIZONTAL:
+            self._send_command({"verticalWind": 0, "horizontalWind": 1, 'horizontalDirection': 1})
