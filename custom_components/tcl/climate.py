@@ -42,6 +42,7 @@ STR_TO_CODE = {
 REVERSE_STR_TO_CODE = {v: k for k, v in STR_TO_CODE.items()}
 # 新增风扇模式与风速百分比的映射
 FAN_SPEED_MAP = {
+    "自动": 0,
     "低": 20,
     "中低": 25,
     "中": 50,
@@ -146,9 +147,9 @@ class TclClimateEntity(TclAbstractEntity, ClimateEntity):
         if wind_speed_percentage is not None:
             # 找到最接近的预设风速
             closest_speed = min(FAN_SPEED_MAP.values(), key=lambda x: abs(x - wind_speed_percentage))
-            self._attr_fan_mode = REVERSE_FAN_SPEED_MAP.get(closest_speed, "中")  # 默认"中"
+            self._attr_fan_mode = REVERSE_FAN_SPEED_MAP.get(closest_speed, "自动")  # 默认"自动"
         else:
-            self._attr_fan_mode = "中"  # 如果数据缺失，默认"中"
+            self._attr_fan_mode = "自动"  # 如果数据缺失，默认"自动"
 
         # 更新摆动模式
         if self._device.attribute_snapshot_data.get("verticalWind") == 1 and self._device.attribute_snapshot_data.get("horizontalWind") == 1:
