@@ -17,13 +17,13 @@ https://bbs.hassbian.com/thread-29746-1-1.html
 
 方法1：下载并复制`custom_components/tcl`文件夹到HomeAssistant根目录下的`custom_components`文件夹即可完成安装
 
-方法2：已经安装了HACS，可以点击按钮快速安装 [![通过HACS添加集成](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=ndwzy&repository=tcl&category=integration)
+方法2：已经安装了HACS，可以点击按钮快速安装 [![通过HACS添加集成](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=ndwzy&repository=tcl-ha&category=integration)
 
 ## 配置
 
 配置 > 设备与服务 >  集成 >  添加集成 > 搜索`tcl`
 
-或者点击: [![添加集成](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start?domain=tcl)
+或者点击: [![添加集成](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start?domain=tcl-ha)
 
 
 ## 调试
