@@ -29,7 +29,20 @@ APP_UUID = 'TCL+'
 APP_PLATFORM_TYPE = 'MemberMiniProgram'
 APP_ENCRYPT_VERSION = '2.0'
 
+# iOS App 凭据 (登录用)
+IOS_APP_ID = '28411606743791229'
+IOS_APP_SECRET = '8f2538acdb620574bf334cd35114f7178c8e790bf216edb7ba749bd6f6d86b44'
+IOS_TENANT_ID = 'TCLPLUS'
+IOS_APP_VERSION = '2.6.1(1344)'
+IOS_PLATFORM_TYPE = 'iOS'
+IOS_STORE_UUID = 'TCL+'
+IOS_USER_AGENT = 'TCLPlus/2.6.1 (iPhone; iOS 15.4.1; Scale/3.00)'
+IOS_REPORT_STATE = '{"os":"iOS","osVersion":"15.4.1","appVersion":"2.6.1","deviceModel":"iPhone"}'
+
 REFRESH_TOKEN_API = 'https://cn.account.tcl.com/auth/auth/refershToken'
+LOGIN_API = 'https://cn.account.tcl.com/auth/auth/login'
+QUICK_LOGIN_API = 'https://cn.account.tcl.com/auth/auth/quickLogin'
+SMS_CAPTCHA_API = 'https://cn.account.tcl.com/captcha/captcha/new/smsCaptcha'
 GET_USER_INFO_API = 'https://cn.account.tcl.com/user/user/getUserInfoByToken'
 GET_DEVICES_API = 'https://io.zx.tcljd.com/v1/tclplus/weChat/user/user_devices'
 GET_MQTT_CONFIG_API = 'https://io.zx.tcljd.com/v1/auth/service/loadBalance'
@@ -451,6 +464,114 @@ class TclClient:
             content = await response.json(content_type=None)
             if 'traceId' in content and content['code'] != '200':
                 raise TclClientException('接口返回异常: ' + content['message'])
+
+    # ============================================================
+    # 登录方法 (iOS App 凭据 + RSA 加密)
+    # ============================================================
+
+    def _build_login_headers(self) -> dict:
+        """构建登录请求头"""
+        return {
+            "Content-Type": "application/json;charset=UTF-8",
+            "t-platform-type": IOS_PLATFORM_TYPE,
+            "uid": "",
+            "Accept": "*/*",
+            "cid": str(uuid.uuid4()).upper(),
+            "Accept-Language": "zh-Hans-CN;q=1, zh-Hant-CN;q=0.9, en-CN;q=0.8",
+            "token": "",
+            "EncryptVersion": "2.0",
+            "t-app-version": IOS_APP_VERSION,
+            "t-store-uuid": IOS_STORE_UUID,
+            "Encrypt": "true",
+            "User-Agent": IOS_USER_AGENT,
+            "t-application-name": "",
+        }
+
+    async def login_by_password(self, phone: str, password: str) -> dict:
+        """密码登录"""
+        from .crypto import md5_hash, encrypt_url_params, encrypt_body
+
+        device_id = str(uuid.uuid4()).upper()
+        params = {
+            "deviceId": device_id,
+            "password": md5_hash(password),
+            "channel": IOS_STORE_UUID,
+            "tenantId": IOS_TENANT_ID,
+            "appSecret": IOS_APP_SECRET,
+            "username": phone,
+            "appId": IOS_APP_ID,
+            "reportState": IOS_REPORT_STATE,
+        }
+
+        url = f"{LOGIN_API}?{encrypt_url_params(params)}"
+        body = encrypt_body(params)
+        headers = self._build_login_headers()
+
+        async with self._session.post(url=url, headers=headers, data=body) as resp:
+            result = await resp.json(content_type=None)
+            if 'accessToken' not in result:
+                raise TclClientException('登录失败: ' + str(result.get('message', result)))
+            return {
+                'accountId': result['accountId'],
+                'accessToken': result['accessToken'],
+                'refreshToken': result['refreshToken'],
+            }
+
+    async def send_sms_captcha(self, phone: str) -> None:
+        """发送短信验证码"""
+        from .crypto import encrypt_url_params, generate_sign, generate_nonce
+
+        import time as _time
+        base_params = {
+            "appId": IOS_APP_ID,
+            "appSecret": IOS_APP_SECRET,
+            "tenantId": IOS_TENANT_ID,
+            "timestamp": str(int(_time.time() * 1000)),
+            "nonce": generate_nonce(),
+            "mobile": phone,
+            "bType": "LOGIN",
+        }
+        base_params["sign"] = generate_sign(base_params)
+
+        url = f"{SMS_CAPTCHA_API}?{encrypt_url_params(base_params)}"
+        headers = self._build_login_headers()
+
+        async with self._session.get(url=url, headers=headers) as resp:
+            result = await resp.json(content_type=None)
+            status = result.get('status', '')
+            code = result.get('code')
+            if status != 'SUCCESS' and code not in (1, 200, 0, '1', '200', '0'):
+                raise TclClientException('短信发送失败: ' + str(result.get('message', result)))
+
+    async def login_by_sms(self, phone: str, code: str) -> dict:
+        """验证码登录 (quickLogin)"""
+        from .crypto import encrypt_url_params, encrypt_body
+
+        device_id = str(uuid.uuid4()).upper()
+        params = {
+            "deviceId": device_id,
+            "bType": "LOGIN",
+            "appSecret": IOS_APP_SECRET,
+            "username": phone,
+            "appId": IOS_APP_ID,
+            "tenantId": IOS_TENANT_ID,
+            "validCode": code,
+            "reportState": IOS_REPORT_STATE,
+        }
+
+        url = f"{QUICK_LOGIN_API}?{encrypt_url_params(params)}"
+        body = encrypt_body(params)
+        headers = self._build_login_headers()
+
+        async with self._session.post(url=url, headers=headers, data=body) as resp:
+            result = await resp.json(content_type=None)
+            if 'accessToken' not in result:
+                raise TclClientException('登录失败: ' + str(result.get('message', result)))
+            return {
+                'accountId': result['accountId'],
+                'accessToken': result['accessToken'],
+                'refreshToken': result['refreshToken'],
+            }
 
     @staticmethod
     def _assert_response_successful(resp):

@@ -75,28 +75,24 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 async def token_updater(hass: HomeAssistant, entry: ConfigEntry, signal: threading.Event):
     """
     每1小时检查一次token有效性，若token刷新则重载集成
-    :param hass:
-    :param entry:
-    :param signal:
-    :return:
     """
     while not signal.is_set():
-        if await try_update_token(hass, entry):
-            _LOGGER.info('token refreshed, reload integration...')
-            await hass.config_entries.async_reload(entry.entry_id)
-            break
-        else:
-            _LOGGER.debug('token is valid')
+        try:
+            if await try_update_token(hass, entry):
+                _LOGGER.info('token refreshed, reload integration...')
+                await hass.config_entries.async_reload(entry.entry_id)
+                break
+            else:
+                _LOGGER.debug('token is valid')
+        except TclClientException as e:
+            _LOGGER.warning('Token刷新失败，请在集成设置中重新配置账号: %s', e)
 
         await asyncio.sleep(3600)
 
 
 async def try_update_token(hass: HomeAssistant, entry: ConfigEntry):
     """
-    尝试刷新token，刷新成功返回True，如refresh_token无效则会抛出异常
-    :param hass:
-    :param entry:
-    :return:
+    尝试刷新token，刷新成功返回True
     """
     cfg = AccountConfig(hass, entry)
     client = TclClient(hass, cfg.account_id, cfg.token)
@@ -105,10 +101,12 @@ async def try_update_token(hass: HomeAssistant, entry: ConfigEntry):
         await client.get_user_info()
         return False
     except TclClientException:
-        token_info = await client.refresh_token(cfg.refresh_token)
-        cfg.token = token_info.token
-        cfg.refresh_token = token_info.refresh_token
-        cfg.save()
+        pass  # token无效，尝试刷新
+
+    token_info = await client.refresh_token(cfg.refresh_token)
+    cfg.token = token_info.token
+    cfg.refresh_token = token_info.refresh_token
+    cfg.save()
 
     return True
 

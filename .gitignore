@@ -1,4 +1,7 @@
 custom_components/tcl/__pycache__/*
-custom_components/tcl/__pycache__/*
 custom_components/tcl/core/__pycache__/*
 custom_components/tcl/session
+
+# 逆向分析相关 (不提交)
+tcl逆向/
+逆向成果/

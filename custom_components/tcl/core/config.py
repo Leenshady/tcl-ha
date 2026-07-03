@@ -22,6 +22,10 @@ class AccountConfig:
 
     default_load_all_entity: bool = None
 
+    login_method: str = None
+
+    phone: str = None
+
     def __init__(self, hass: HomeAssistant, config: ConfigEntry):
         self._hass = hass
         self._config = config
@@ -32,6 +36,8 @@ class AccountConfig:
         self.refresh_token = cfg.get('refresh_token', '')
         self.expires_at = cfg.get('expires_at', 0)
         self.default_load_all_entity = cfg.get('default_load_all_entity', True)
+        self.login_method = cfg.get('login_method', 'token')
+        self.phone = cfg.get('phone', '')
 
 
     def save(self, mobile: str = None):
@@ -45,7 +51,9 @@ class AccountConfig:
                     'token': self.token,
                     'refresh_token': self.refresh_token,
                     'expires_at': self.expires_at,
-                    'default_load_all_entity': self.default_load_all_entity
+                    'default_load_all_entity': self.default_load_all_entity,
+                    'login_method': self.login_method,
+                    'phone': self.phone
                 }
             }
         )
