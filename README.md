@@ -5,6 +5,7 @@ https://bbs.hassbian.com/thread-29746-1-1.html
 目前手头家居大多都换上小米设备了，不出问题的话可能较长时间都不会更新
 
 使用抓包工具抓到小程序登录时的account_id和refreshToken即可
+目前已支持账号直接登录
 
 感谢[banto6](https://github.com/banto6/haier)提供的参考
 ## 已支持实体
