@@ -9,6 +9,12 @@ from ..helpers import ATTR_NAME
 
 _LOGGER = logging.getLogger(__name__)
 
+# 只读属性，应解析为 SENSOR 而非 NUMBER/SELECT
+READONLY_SENSOR_KEYS = {
+    'filterAgePercentage',
+    'selfCleanStatus',
+}
+
 
 class TclAttribute:
 
@@ -49,6 +55,9 @@ class TclAttributeParser(ABC):
 class V1SpecAttributeParser(TclAttributeParser, ABC):
 
     def parse_attribute(self, attribute: dict) -> TclAttribute:
+        # 只读属性 → 传感器
+        if attribute.get('identifier') in READONLY_SENSOR_KEYS:
+            return self._parse_as_simple_sensor(attribute)
         # 按钮处理
         if 'bool' in attribute['type']:
             return self._parse_as_switch(attribute)
@@ -63,6 +72,38 @@ class V1SpecAttributeParser(TclAttributeParser, ABC):
             return self._parse_as_sensor(attribute)
 
         return None
+
+    @staticmethod
+    def _parse_as_simple_sensor(attribute):
+        """将只读属性解析为简单传感器（非结构体类型）"""
+        data_type = attribute['type']
+        specs = attribute['specs']
+        ext = {'sensor_type': 'simple'}
+        options = {}
+
+        if 'enum' in data_type:
+            value_comparison_table = {}
+            options_list = []
+            for key, value in specs.items():
+                value_comparison_table[str(key)] = value
+                options_list.append(value)
+            options = {
+                'device_class': SensorDeviceClass.ENUM,
+                'options': options_list
+            }
+            ext['value_comparison_table'] = value_comparison_table
+        elif 'int' in data_type or 'double' in data_type or 'float' in data_type:
+            if 'unit' in specs:
+                options['native_unit_of_measurement'] = specs['unit']
+            ext['unit'] = specs.get('unit', '')
+
+        return TclAttribute(
+            attribute['identifier'],
+            ATTR_NAME.get(attribute['identifier'], attribute['title']),
+            Platform.SENSOR,
+            options,
+            ext
+        )
 
     @staticmethod
     def _parse_as_sensor(attribute):

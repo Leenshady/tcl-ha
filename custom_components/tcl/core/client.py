@@ -16,6 +16,7 @@ from homeassistant.util.ssl import client_context
 from .device import TclDevice
 from .event import EVENT_DEVICE_DATA_CHANGED, EVENT_GATEWAY_STATUS_CHANGED
 from .event import fire_event
+from ..ac.panel_config_fallback import get_fallback_attributes, merge_attributes
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -49,6 +50,7 @@ GET_MQTT_CONFIG_API = 'https://io.zx.tcljd.com/v1/auth/service/loadBalance'
 CONTROL_DEVICE_API = 'https://io.zx.tcljd.com/v1/control/property/{deviceId}'
 DEVICE_STATUS_API = 'https://io.zx.tcljd.com/v1/thing/status'
 GET_DIGITAL_MODEL_API = 'https://io.zx.tcljd.com/v1/tclplus/panel/rn-panel-config'
+ELECTRICITY_SUMMARY_API = 'https://io.zx.tcljd.com/v1/ac/statistics/electricity/summary'
 
 
 def random_str(length: int = 32) -> str:
@@ -81,6 +83,7 @@ class TclClient:
         self._token = token
         self._hass = hass
         self._session = async_get_clientsession(hass)
+        self._user_id = None
         # 预创建 SSLContext 对象
         self.ssl_context = None  # 初始化为 None
 
@@ -232,10 +235,36 @@ class TclClient:
 
     async def get_digital_model_from_cache(self, device: TclDevice) -> list:
         """
-        尝试从缓存中获取设备attributes，若获取失败则自动从远程获取并保存到缓存中
+        获取设备 attributes。
+        有本地 fallback 时：先请求 API（主），再用 fallback 补充缺失属性（合并去重）。
+        无本地 fallback 时：走 HA Storage 缓存 → API 远程获取 逻辑。
         :param device:
         :return:
         """
+        local_attrs = get_fallback_attributes(device.product_key)
+
+        # 有本地 fallback：API 为主 + fallback 合并，不使用缓存
+        if local_attrs:
+            try:
+                api_attrs = await self.get_digital_model(device.product_key)
+            except Exception as e:
+                _LOGGER.warning(
+                    "Device %s API request failed (%s), using local fallback only (%d attributes)",
+                    device.id, e, len(local_attrs)
+                )
+                api_attrs = []
+
+            merged = merge_attributes(api_attrs, device.product_key)
+            _LOGGER.info(
+                "Device %s (productKey=%s) merged: API=%d, fallback=%d, merged=%d",
+                device.id, device.product_key,
+                len(api_attrs) if api_attrs else 0,
+                len(local_attrs),
+                len(merged)
+            )
+            return merged
+
+        # 无本地 fallback：走缓存 + API 逻辑
         store = Store(self._hass, 1, 'tcl/device_{}.json'.format(device.id))
         cache = None
         try:
@@ -297,6 +326,7 @@ class TclClient:
         MQTT_HOST = "iotws-prod.tcliot.com"
         MQTT_PORT = 443
         USER_ID = mqtt_config['userId']
+        self._user_id = USER_ID
         ACCESS_TOKEN = self._token
         DEVICE_LIST = [{'deviceId': device.id, 'productKey': device.product_key} for device in targetDevices]
 
@@ -573,7 +603,26 @@ class TclClient:
                 'refreshToken': result['refreshToken'],
             }
 
+    async def get_electricity_summary(self, deviceId: str, product_key: str, time_type: int = 1) -> dict:
+        """
+        获取设备电量统计
+        :param deviceId: 设备ID
+        :param product_key: 设备 productKey (作为请求头)
+        :param time_type: 时间类型 (1=周, 2=月, 3=年)
+        :return: API 原始 data 字段，包含 ecoDetails 和 workModeDetails
+        """
+        api_url = ELECTRICITY_SUMMARY_API + '?timeType=' + str(time_type)
+        api_headers = self._get_io_headers()
+        api_headers['productKey'] = product_key
+        api_headers['deviceId'] = deviceId
+        if self._user_id:
+            api_headers['userId'] = self._user_id
+        async with self._session.get(url=api_url, headers=api_headers) as response:
+            content = await response.json(content_type=None)
+            self._assert_response_successful(content)
+            return content.get('data', {})
+
     @staticmethod
     def _assert_response_successful(resp):
-        if 'traceId' in resp and resp['code'] != '200':
+        if 'traceId' in resp and str(resp['code']) not in ('200', '0'):
             raise TclClientException('接口返回异常: ' + resp['message'])

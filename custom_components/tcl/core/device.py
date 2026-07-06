@@ -65,14 +65,31 @@ class TclDevice:
             parser = V1SpecAttributeParser()
             attributes = await self._client.get_digital_model_from_cache(self)
 
-            for item in attributes:
+            _LOGGER.info(
+                'Device %s (productKey=%s) got %d raw attributes',
+                self.id, self.product_key, len(attributes) if attributes else 0
+            )
+
+            for item in (attributes or []):
                 try:
-                    # item.value=snapshot_data[item['identifier']]
                     attr = parser.parse_attribute(item)
                     if attr:
                         self._attributes.append(attr)
-                except:
-                    _LOGGER.exception("Tcl device %s attribute %s parsing error occurred", self.id, item['name'])
+                        _LOGGER.info(
+                            'Device %s parsed: key=%s -> platform=%s',
+                            self.id, attr.key, attr.platform
+                        )
+                    else:
+                        _LOGGER.warning(
+                            'Device %s attribute %s (type=%s) returned None',
+                            self.id, item.get('identifier'), item.get('type')
+                        )
+                except Exception:
+                    _LOGGER.exception(
+                        "Tcl device %s attribute %s parsing error occurred",
+                        self.id, item.get('name', item.get('identifier', 'unknown'))
+                    )
+
             snapshot_data = await self._client.get_device_snapshot_data(self.id)
             _LOGGER.debug(
                 'device %s snapshot data fetch successful. data: %s',

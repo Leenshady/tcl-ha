@@ -25,7 +25,12 @@ ATTR_NAME = {
     "selfLearn": "自学习",
     "selfClean": "蒸发器清洁",
     "PTC": "电辅热",
-    "horizontalWind": "左右扫风"
+    "horizontalWind": "左右扫风",
+    "softWind": "柔风",
+    "lightSense": "光敏",
+    "blueLightSwitch": "小蓝翼灯光",
+    "horizontalDirection": "左右送风",
+    "verticalDirection": "上下送风",
 }
 
 def try_read_as_bool(value):
