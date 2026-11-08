@@ -18,9 +18,12 @@ from .const import (
     MIN_SCAN_INTERVAL,
     POLL_JITTER_MAX,
     POLL_WAIT_CHUNK,
+    CONF_KEEPALIVE_ENABLED,
+    DEFAULT_KEEPALIVE_ENABLED,
     CONF_KEEPALIVE_INTERVAL,
     DEFAULT_KEEPALIVE_INTERVAL,
     MIN_KEEPALIVE_INTERVAL,
+    MAX_KEEPALIVE_INTERVAL,
     KEEPALIVE_ACTIVITY_KEY,
     KEEPALIVE_DEVICE_SPREAD_MIN,
     KEEPALIVE_DEVICE_SPREAD_MAX,
@@ -226,8 +229,19 @@ async def data_updater(hass: HomeAssistant, entry: ConfigEntry, targetDevices: L
         next_due = _next_due(time.monotonic())
 
 
+def _is_keepalive_enabled(entry: ConfigEntry) -> bool:
+    """集成设置里的保活开关。兼容手工写入的字符串值(如 'false')。"""
+    raw = entry.options.get(CONF_KEEPALIVE_ENABLED, DEFAULT_KEEPALIVE_ENABLED)
+    if isinstance(raw, str):
+        return raw.strip().lower() not in ('false', '0', 'no', 'off', '')
+    return bool(raw)
+
+
 def _get_keepalive_interval(entry: ConfigEntry) -> int:
-    """获取保活间隔(秒)，0 表示关闭保活"""
+    """获取保活间隔(秒)，0 表示关闭保活(开关关闭或间隔填 0)"""
+    if not _is_keepalive_enabled(entry):
+        return 0
+
     raw = entry.options.get(CONF_KEEPALIVE_INTERVAL, DEFAULT_KEEPALIVE_INTERVAL)
     try:
         interval = int(raw)
@@ -236,7 +250,7 @@ def _get_keepalive_interval(entry: ConfigEntry) -> int:
 
     if interval <= 0:
         return 0
-    return max(interval, MIN_KEEPALIVE_INTERVAL)
+    return min(max(interval, MIN_KEEPALIVE_INTERVAL), MAX_KEEPALIVE_INTERVAL)
 
 
 def _keepalive_schedule(device_ids: List[str], now: float, activity: dict,
@@ -280,7 +294,13 @@ async def keepalive_updater(hass: HomeAssistant, entry: ConfigEntry,
     """
     interval = _get_keepalive_interval(entry)
     if interval <= 0:
-        _LOGGER.info('device keepalive disabled')
+        _LOGGER.info(
+            'device keepalive disabled by options (%s=%s, %s=%s)',
+            CONF_KEEPALIVE_ENABLED,
+            entry.options.get(CONF_KEEPALIVE_ENABLED, DEFAULT_KEEPALIVE_ENABLED),
+            CONF_KEEPALIVE_INTERVAL,
+            entry.options.get(CONF_KEEPALIVE_INTERVAL, DEFAULT_KEEPALIVE_INTERVAL),
+        )
         return
 
     if not targetDevices:
