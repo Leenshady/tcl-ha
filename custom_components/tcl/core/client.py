@@ -28,6 +28,16 @@ from ..const import (
     MQTT_RETRY_MAX,
     MQTT_DISCONNECT_GRACE,
     MQTT_SILENT_TIMEOUT,
+    WSS_PROBE_URL,
+    WSS_PROBE_ORIGIN,
+    WSS_PROBE_SUBPROTOCOL,
+    WSS_PROBE_TIMEOUT,
+    MQTT_CLIENT_ID_SUFFIX_MIN,
+    MQTT_CLIENT_ID_SUFFIX_MAX,
+    MQTT_EVENT_TOPIC_SUFFIX,
+    MQTT_PROPERTY_POST_SUFFIX,
+    MQTT_DEDUP_WINDOW,
+    MQTT_DEDUP_CACHE_MAX,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -532,6 +542,29 @@ class TclClient:
             return {}
         return content['data']['status']
 
+    async def wss_probe_once(self) -> float:
+        """模拟小程序后台的 2 帧短 WSS 连接，返回耗时(秒)。
+
+        两份 HAR 实测：小程序每 120s 建立一条 wss://iotws-prod.tcliot.com/mqtt，
+        只交换 2 个 WS 帧、不含任何 MQTT 报文，随即关闭。这里复现同样的握手
+        （Origin + mqtt 子协议）与一次 PING/PONG。
+
+        注意：这条连接终止在云端 broker，不触达设备，对 30/60s 睡窗没有
+        抑制作用；仅用于让插件的客户端行为与小程序一致，便于对照验证。
+        """
+        started = time.monotonic()
+
+        async def _probe() -> None:
+            async with self._session.ws_connect(
+                WSS_PROBE_URL,
+                origin=WSS_PROBE_ORIGIN,
+                protocols=(WSS_PROBE_SUBPROTOCOL,),
+            ) as ws:
+                await ws.ping()
+
+        await asyncio.wait_for(_probe(), WSS_PROBE_TIMEOUT)
+        return time.monotonic() - started
+
     async def listen_devices(self, targetDevices: List[TclDevice], signal: threading.Event):
         """
         监听设备数据变化（MQTT over WebSocket）。
@@ -619,6 +652,9 @@ class TclClient:
             'last_disconnect': time.monotonic(),
             'suppress_status': False,
         }
+        # 小程序同时订阅 property/post 与 event/+/post，两个 filter 会匹配
+        # 同一条上报；MQTT 3.1.1 允许 broker 投递多份，这里按内容短时去重。
+        dedup_cache: dict[str, float] = {}
 
         def on_connect(client, userdata, flags, rc):
             if rc != 0:
@@ -638,8 +674,10 @@ class TclClient:
                 subscriptions = (
                     # 属性上报：设备/面板/遥控器改变状态后推送
                     (f"/sys/{product_key}/{device_id}/thing/event/property/post", '属性上报'),
-                    # 设备级事件（含上下线等）。单层通配不会与上面重复订阅
-                    (f"/sys/{product_key}/{device_id}/thing/event/+", '设备事件'),
+                    # 小程序 HAR 实测订阅的是 7 层 .../thing/event/+/post。
+                    # 它与上面的 property/post 精确订阅会双匹配同一条消息，
+                    # on_message 里做短时去重，避免重复 fire_event。
+                    (f"/sys/{product_key}/{device_id}{MQTT_EVENT_TOPIC_SUFFIX}", '设备事件'),
                     # 控制回执：确认下发的命令是否被设备接受
                     (f"/sys/{product_key}/{device_id}/thing/service/property/set_reply", '控制回执'),
                 )
@@ -671,6 +709,19 @@ class TclClient:
                 payload_raw = msg.payload.decode()
             except Exception:  # noqa: BLE001
                 payload_raw = repr(msg.payload)
+
+            now = time.monotonic()
+            dedup_key = f'{msg.topic}|{payload_raw}'
+            last_seen = dedup_cache.get(dedup_key)
+            if last_seen is not None and now - last_seen < MQTT_DEDUP_WINDOW:
+                _LOGGER.debug('忽略双匹配订阅的重复投递: %s', msg.topic)
+                return
+            dedup_cache[dedup_key] = now
+            if len(dedup_cache) > MQTT_DEDUP_CACHE_MAX:
+                for key, ts in list(dedup_cache.items()):
+                    if now - ts >= MQTT_DEDUP_WINDOW:
+                        dedup_cache.pop(key, None)
+
             _LOGGER.debug('收到消息 主题:%s 内容:%s', msg.topic, payload_raw)
 
             try:
@@ -682,7 +733,7 @@ class TclClient:
                 return
 
             try:
-                if '/thing/event/property/post' in msg.topic:
+                if msg.topic.endswith(MQTT_PROPERTY_POST_SUFFIX):
                     self._handle_property_post(msg.topic, payload)
                 elif '/thing/service/property/set_reply' in msg.topic:
                     self._handle_set_reply(msg.topic, payload)
@@ -767,8 +818,9 @@ class TclClient:
 
     def _build_mqtt_client(self, user_id: str):
         """创建一个配置好传输层与凭据的 MQTT 客户端（尚未连接）"""
-        # clientId 每轮重新生成，避免与上一轮的会话互相抢占
-        suffix = str(random.randint(1000, 9999))
+        # clientId 每轮重新生成，避免与上一轮的会话互相抢占。
+        # 小程序 HAR 实测格式：<uid>@miniprogram@<3 位随机><13 位毫秒戳>（16 位）
+        suffix = str(random.randint(MQTT_CLIENT_ID_SUFFIX_MIN, MQTT_CLIENT_ID_SUFFIX_MAX))
         timestamp = str(int(time.time() * 1000))
         client_id = f"{user_id}@miniprogram@{suffix}{timestamp}"
 
@@ -791,7 +843,16 @@ class TclClient:
 
         client.username_pw_set(username=user_id, password=self._token)
         client.tls_set_context(self.ssl_context)
-        client.ws_set_options(path="/mqtt")
+        # 小程序 WS 握手带 Origin: https://iotws-prod.tcliot.com
+        # paho 的 ws_set_options 支持 headers（dict 或 callable），但 manifest
+        # 未锁版本，老版本没有该参数时退回原行为，不影响建连。
+        try:
+            client.ws_set_options(
+                path="/mqtt",
+                headers={"Origin": WSS_PROBE_ORIGIN},
+            )
+        except TypeError:
+            client.ws_set_options(path="/mqtt")
         client.reconnect_delay_set(min_delay=1, max_delay=30)
         return client
 

@@ -30,6 +30,9 @@ from .const import (
     KEEPALIVE_ATTRIBUTE,
     KEEPALIVE_TIMEOUT,
     KEEPALIVE_SLOW_THRESHOLD,
+    CONF_WSS_PARITY_ENABLED,
+    DEFAULT_WSS_PARITY_ENABLED,
+    WSS_PROBE_INTERVAL,
     TOKEN_REFRESH_MARGIN_RATIO,
     TOKEN_REFRESH_MARGIN_MIN,
     TOKEN_REFRESH_MARGIN_MAX,
@@ -73,6 +76,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         refresh_token=account_cfg.refresh_token,
         entry=entry,
     )
+    hass.data[DOMAIN]['client'] = client
     devices = await asyncio.wait_for(client.get_devices(), 25)
     _LOGGER.debug('共获取到{}个设备'.format(len(devices)))
 
@@ -103,6 +107,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         'tcl-device-keepalive'
     )
     hass.data[DOMAIN]['signals'].append(keepalive_signal)
+
+    # 小程序 WSS 对齐（实验）：后台每 120s 一条 2 帧短连接，与常连监听互不影响
+    wss_parity_signal = threading.Event()
+    hass.async_create_background_task(
+        wss_probe_updater(hass, entry, wss_parity_signal),
+        'tcl-wss-parity-probe'
+    )
+    hass.data[DOMAIN]['signals'].append(wss_parity_signal)
 
     # 修正历史版本生成的错误实体ID域名(tcl.xxx -> select.tcl_xxx 等)，
     # 必须在实体创建之前完成，否则会留下两条指向同一 unique_id 的记录
@@ -251,6 +263,47 @@ def _get_keepalive_interval(entry: ConfigEntry) -> int:
     if interval <= 0:
         return 0
     return min(max(interval, MIN_KEEPALIVE_INTERVAL), MAX_KEEPALIVE_INTERVAL)
+
+
+def _is_wss_parity_enabled(entry: ConfigEntry) -> bool:
+    """小程序 WSS 对齐开关（实验）。兼容手工写入 options 的字符串值。"""
+    raw = entry.options.get(CONF_WSS_PARITY_ENABLED, DEFAULT_WSS_PARITY_ENABLED)
+    if isinstance(raw, str):
+        return raw.strip().lower() not in ('false', '0', 'no', 'off', '')
+    return bool(raw)
+
+
+async def wss_probe_updater(hass: HomeAssistant, entry: ConfigEntry,
+                            signal: threading.Event):
+    """每 120s 建立一条与小程序一致的 2 帧短 WSS 连接（实验）。
+
+    与常连的 listen_devices 完全独立：短连接不订阅、不发 MQTT 报文，
+    失败只记 debug，不影响状态同步或设备保活。可在集成设置里关闭。
+    """
+    if not _is_wss_parity_enabled(entry):
+        _LOGGER.info('miniprogram WSS parity probe disabled by options')
+        return
+
+    client = hass.data.get(DOMAIN, {}).get('client')
+    if client is None:
+        _LOGGER.warning('miniprogram WSS parity probe disabled: no client')
+        return
+
+    _LOGGER.info(
+        'miniprogram WSS parity probe enabled, interval %ss', WSS_PROBE_INTERVAL
+    )
+    while not signal.is_set():
+        if await _interruptible_sleep(signal, WSS_PROBE_INTERVAL):
+            break
+        if signal.is_set():
+            break
+        try:
+            elapsed = await client.wss_probe_once()
+            _LOGGER.debug('miniprogram WSS probe ok in %.3fs', elapsed)
+        except asyncio.TimeoutError:
+            _LOGGER.debug('miniprogram WSS probe timed out')
+        except Exception as err:  # noqa: BLE001 探针失败不能影响集成
+            _LOGGER.debug('miniprogram WSS probe failed: %s', err)
 
 
 def _keepalive_schedule(device_ids: List[str], now: float, activity: dict,

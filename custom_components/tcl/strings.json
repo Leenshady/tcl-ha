@@ -63,7 +63,8 @@
                     "device": "Device Filter",
                     "entity_device_selector": "Entity Filter",
                     "polling": "State polling",
-                    "keepalive": "Device keepalive"
+                    "keepalive": "Device keepalive",
+                    "wss_parity": "Miniprogram WSS parity (experimental)"
                 }
             },
             "account": {
@@ -142,6 +143,16 @@
                 "data_description": {
                     "keepalive_enabled": "Turn off to stop sending any background command to the device",
                     "keepalive_interval": "90-3600 seconds, default 120. A user command resets the timer for that device."
+                }
+            },
+            "wss_parity": {
+                "title": "Miniprogram WSS parity (experimental)",
+                "description": "Aligns the MQTT over WebSocket handshake (clientId, Origin header, subscription topics) with the WeChat miniprogram, and opens one extra 2-frame short WSS connection every 120s. That connection terminates at the cloud broker and never reaches the device, so it does NOT reduce the 30/60s sleep window. Experimental: disabling it saves about 720 extra TLS handshakes per day and does not affect state sync or device keepalive.",
+                "data": {
+                    "wss_parity_enabled": "Enable miniprogram WSS short probe"
+                },
+                "data_description": {
+                    "wss_parity_enabled": "Every 120s, one short WSS handshake with a PING then close. No MQTT packet is sent."
                 }
             }
         }

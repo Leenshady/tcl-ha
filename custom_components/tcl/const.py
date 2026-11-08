@@ -95,3 +95,28 @@ TOKEN_RETRY_MAX = 1800
 LOGIN_METHOD_TOKEN = 'token'
 LOGIN_METHOD_PASSWORD = 'password'
 LOGIN_METHOD_SMS = 'sms'
+
+# ---------------- 小程序 WSS 对齐（实验分支） ----------------
+# 依据两份小程序 HAR 的 WS 握手 / MQTT CONNECT / SUBSCRIBE 实测：
+#   wss://iotws-prod.tcliot.com/mqtt，Origin: https://iotws-prod.tcliot.com
+#   clientId = <uid>@miniprogram@<3 位随机><13 位毫秒戳>（后缀 16 位）
+#   第 4 条订阅为 /sys/{pk}/{did}/thing/event/+/post（7 层）
+#   前台长会话 + 后台每 120s 一条「2 帧、0 个 MQTT 报文」的短连接
+# 重要：这些改动只作用于「客户端 ↔ 云端 broker」这一段。WSS 是观察者连接，
+# PINGREQ 逐跳、不转发设备，因此不会抑制 30/60s 睡窗；真正触达设备的仍是
+# HTTP 控制指令（设备保活）。此分支仅用于验证「客户端行为一致」是否有副作用。
+WSS_PROBE_URL = 'wss://iotws-prod.tcliot.com/mqtt'
+WSS_PROBE_ORIGIN = 'https://iotws-prod.tcliot.com'
+WSS_PROBE_SUBPROTOCOL = 'mqtt'
+WSS_PROBE_INTERVAL = 120
+WSS_PROBE_TIMEOUT = 10
+MQTT_CLIENT_ID_SUFFIX_MIN = 100
+MQTT_CLIENT_ID_SUFFIX_MAX = 999
+MQTT_EVENT_TOPIC_SUFFIX = '/thing/event/+/post'
+MQTT_PROPERTY_POST_SUFFIX = '/thing/event/property/post'
+# broker 对「精确订阅 + 通配订阅双匹配」可能投递两份，按 topic+payload 短时去重
+MQTT_DEDUP_WINDOW = 1.0
+MQTT_DEDUP_CACHE_MAX = 256
+
+CONF_WSS_PARITY_ENABLED = 'wss_parity_enabled'
+DEFAULT_WSS_PARITY_ENABLED = True

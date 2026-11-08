@@ -14,6 +14,7 @@ from .const import (
     CONF_KEEPALIVE_ENABLED, DEFAULT_KEEPALIVE_ENABLED,
     CONF_KEEPALIVE_INTERVAL, DEFAULT_KEEPALIVE_INTERVAL,
     MIN_KEEPALIVE_INTERVAL, MAX_KEEPALIVE_INTERVAL,
+    CONF_WSS_PARITY_ENABLED, DEFAULT_WSS_PARITY_ENABLED,
 )
 from .core.client import TclClientException, TclClient, account_id_from_refresh_token
 from .core.config import AccountConfig, DeviceFilterConfig, EntityFilterConfig
@@ -243,7 +244,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         """功能菜单"""
         return self.async_show_menu(
             step_id="init",
-            menu_options=['account', 'device', 'entity_device_selector', 'polling', 'keepalive']
+            menu_options=['account', 'device', 'entity_device_selector', 'polling', 'keepalive', 'wss_parity']
         )
 
     @staticmethod
@@ -288,6 +289,28 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                     vol.All(vol.Coerce(int), vol.Range(
                         min=MIN_KEEPALIVE_INTERVAL, max=MAX_KEEPALIVE_INTERVAL
                     )),
+            })
+        )
+
+    async def async_step_wss_parity(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+        """小程序 WSS 对齐（实验）：是否每 120s 发一条 2 帧短连接。
+
+        该短连接只到达云端 broker，不触达设备；关闭它不影响状态同步与设备保活。
+        """
+        if user_input is not None:
+            options = dict(self.config_entry.options)
+            options[CONF_WSS_PARITY_ENABLED] = bool(user_input[CONF_WSS_PARITY_ENABLED])
+            self.hass.config_entries.async_update_entry(self.config_entry, options=options)
+            return self.async_create_entry(title='', data=options)
+
+        current = self._as_bool(
+            self.config_entry.options.get(CONF_WSS_PARITY_ENABLED),
+            DEFAULT_WSS_PARITY_ENABLED,
+        )
+        return self.async_show_form(
+            step_id="wss_parity",
+            data_schema=vol.Schema({
+                vol.Required(CONF_WSS_PARITY_ENABLED, default=current): bool,
             })
         )
 

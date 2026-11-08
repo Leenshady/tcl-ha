@@ -63,7 +63,8 @@
                     "device": "设备筛选",
                     "entity_device_selector": "实体筛选",
                     "polling": "状态轮询",
-                    "keepalive": "设备保活"
+                    "keepalive": "设备保活",
+                    "wss_parity": "小程序 WSS 对齐（实验）"
                 }
             },
             "account": {
@@ -142,6 +143,16 @@
                 "data_description": {
                     "keepalive_enabled": "关闭后插件不会再向设备发送任何后台控制指令",
                     "keepalive_interval": "范围 90~3600 秒，默认 120 秒；用户指令会重置该设备的计时"
+                }
+            },
+            "wss_parity": {
+                "title": "小程序 WSS 对齐（实验）",
+                "description": "把 MQTT over WebSocket 握手（clientId、Origin 头、订阅主题）对齐到微信小程序，并每 120 秒额外建立一条只交换 2 帧的短 WSS 连接。该连接终止在云端 broker，不会触达设备，因此不会减少 30/60 秒睡窗。实验功能：关闭后每天可省约 720 次额外 TLS 握手，且不影响状态同步与设备保活。",
+                "data": {
+                    "wss_parity_enabled": "启用小程序 WSS 短连接探针"
+                },
+                "data_description": {
+                    "wss_parity_enabled": "每 120 秒建立一次短 WSS 握手，发一个 PING 后关闭，不发送任何 MQTT 报文。"
                 }
             }
         }
